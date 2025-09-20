@@ -135,7 +135,7 @@ fun ProductList(productDao: ProductDao) {
 
     LazyColumn {
         items(products) { product ->
-            Text("${product.name} → ${product.price} (${formatDate(product.timestamp)})")
+            Text("${product.name} → ${product.price} (${formatDate(product.timestamp)}) ${product.url}")
         }
     }
 }
