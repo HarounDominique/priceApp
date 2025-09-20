@@ -4,6 +4,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -23,36 +24,45 @@ class PriceUpdateWorker(
     private val NOTIF_ID = 1
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        Log.d("PriceUpdateWorker", "Worker disparado: iniciando consulta automática")
         try {
             val db = AppDatabase.getDatabase(applicationContext)
             val productDao = db.productDao()
 
-            val products: List<Product> = productDao.getAllProductsOnce() // función suspend para obtener lista actual
+            val products: List<Product> = productDao.getAllProductsOnce()
 
             products.forEach { product ->
                 try {
                     val response = RetrofitClient.api.getPrice(UrlRequest(product.url))
-
                     val newPrice = response.price.toDoubleOrNull() ?: return@forEach
                     val oldPrice = product.price.toDoubleOrNull() ?: return@forEach
 
+                    Log.d(
+                        "PriceUpdateWorker",
+                        "Consulta completada para ${product.name}: precio actual = $newPrice, precio base = $oldPrice"
+                    )
+
+                    // ---------- TEMPORAL: disparar notificación siempre (para pruebas) ----------
+                    // sendNotification(
+                    //     productName = product.name,
+                    //     oldPrice = oldPrice,
+                    //     newPrice = newPrice
+                    // )
+                    // ----------------------------------------------------------------
+
+                    // Versión final: solo disparar notificación si el precio bajó
                     if (newPrice < oldPrice) {
-                        // Precio bajó, enviamos notificación
-                        sendNotification(
-                            productName = product.name,
-                            oldPrice = oldPrice,
-                            newPrice = newPrice
-                        )
+                        sendNotification(product.name, oldPrice, newPrice)
                     }
 
-                    // NO actualizamos la base de datos
-                } catch (_: Exception) {
-                    // ignoramos errores de conexión
+                } catch (e: Exception) {
+                    Log.e("PriceUpdateWorker", "Error consultando ${product.url}: ${e.message}")
                 }
             }
 
             Result.success()
         } catch (e: Exception) {
+            Log.e("PriceUpdateWorker", "Worker fallo: ${e.message}")
             Result.failure()
         }
     }
@@ -61,7 +71,6 @@ class PriceUpdateWorker(
         val notifManager =
             applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        // Crear canal si es Android >= O
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -72,8 +81,8 @@ class PriceUpdateWorker(
         }
 
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("Precio bajó: $productName")
-            .setContentText("De $oldPrice → $newPrice")
+            .setContentTitle("Precio revisado: $productName")
+            .setContentText("Precio base: $oldPrice → Precio actual: $newPrice")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
 
