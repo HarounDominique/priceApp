@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.haroun.priceapp.ui.theme.PriceAppTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +29,9 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     var url by remember { mutableStateOf("") }
     var result by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
@@ -51,15 +55,24 @@ fun MainScreen() {
 
             Button(
                 onClick = {
-                    // Aquí iría la lógica de búsqueda de precio
-                    result = "Buscando precio para: $url"
+                    scope.launch {
+                        try {
+                            loading = true
+                            val response = RetrofitClient.api.getPrice(UrlRequest(url))
+                            result = "${response.name} → ${response.price} ${response.currency}"
+                        } catch (e: Exception) {
+                            result = "Error: ${e.message}"
+                        } finally {
+                            loading = false
+                        }
+                    }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loading
             ) {
-                Text("Buscar")
+                Text(if (loading) "Buscando..." else "Buscar")
             }
 
-            // Mostrar resultado
             result?.let {
                 Text(
                     text = it,
