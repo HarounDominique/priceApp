@@ -67,6 +67,14 @@ class PriceUpdateWorker(
         }
     }
 
+    private fun truncate(text: String, maxLength: Int = 40): String {
+        return if (text.length > maxLength) {
+            text.take(maxLength).substringBeforeLast(" ") + "..."
+        } else {
+            text
+        }
+    }
+
     private fun sendNotification(productName: String, oldPrice: Double, newPrice: Double) {
         val notifManager =
             applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -80,9 +88,11 @@ class PriceUpdateWorker(
             notifManager.createNotificationChannel(channel)
         }
 
+        val shortName = truncate(productName, 40)
+
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("Precio revisado: $productName")
-            .setContentText("Precio base: $oldPrice → Precio actual: $newPrice")
+            .setContentTitle("¡Hey! $shortName ha bajado de precio")
+            .setContentText("Antes costaba $oldPrice€, ahora cuesta $newPrice€")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .build()
 
