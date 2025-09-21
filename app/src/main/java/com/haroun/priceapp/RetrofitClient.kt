@@ -4,14 +4,20 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import okhttp3.logging.HttpLoggingInterceptor
 
 object RetrofitClient {
     private const val BASE_URL = "https://price-api-pwzq.onrender.com"
 
+    private val logging = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+    }
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(60, TimeUnit.SECONDS)  // tiempo máximo para conectar
+        .addInterceptor(logging)
+        .connectTimeout(120, TimeUnit.SECONDS)  // tiempo máximo para conectar
         .readTimeout(120, TimeUnit.SECONDS)    // tiempo máximo para recibir datos
-        .writeTimeout(60, TimeUnit.SECONDS)    // tiempo máximo para enviar datos
+        .writeTimeout(120, TimeUnit.SECONDS)    // tiempo máximo para enviar datos
         .build()
 
     val api: ApiService by lazy {

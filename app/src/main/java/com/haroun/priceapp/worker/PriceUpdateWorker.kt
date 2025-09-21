@@ -14,6 +14,7 @@ import com.haroun.priceapp.RetrofitClient
 import com.haroun.priceapp.UrlRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 
 class PriceUpdateWorker(
     context: Context,
@@ -33,7 +34,9 @@ class PriceUpdateWorker(
 
             products.forEach { product ->
                 try {
-                    val response = RetrofitClient.api.getPrice(UrlRequest(product.url))
+                    val response = retryOnHostResolution {
+                        RetrofitClient.api.getPrice(UrlRequest(product.url))
+                    }
                     val newPrice = response.price.toDoubleOrNull() ?: return@forEach
                     val oldPrice = product.price.toDoubleOrNull() ?: return@forEach
 
@@ -41,14 +44,6 @@ class PriceUpdateWorker(
                         "PriceUpdateWorker",
                         "Consulta completada para ${product.name}: precio actual = $newPrice, precio base = $oldPrice"
                     )
-
-                    // ---------- TEMPORAL: disparar notificación siempre (para pruebas) ----------
-                    // sendNotification(
-                    //     productName = product.name,
-                    //     oldPrice = oldPrice,
-                    //     newPrice = newPrice
-                    // )
-                    // ----------------------------------------------------------------
 
                     // Versión final: solo disparar notificación si el precio bajó
                     if (newPrice < oldPrice) {
@@ -65,6 +60,29 @@ class PriceUpdateWorker(
             Log.e("PriceUpdateWorker", "Worker fallo: ${e.message}")
             Result.failure()
         }
+    }
+
+    /**
+     * Reintenta una operación en caso de fallo de DNS (UnknownHostException).
+     */
+    private suspend fun <T> retryOnHostResolution(
+        retries: Int = 3,
+        delayMs: Long = 5000,
+        block: suspend () -> T
+    ): T {
+        var lastError: Exception? = null
+        repeat(retries) { attempt ->
+            try {
+                return block()
+            } catch (e: java.net.UnknownHostException) {
+                lastError = e
+                if (attempt < retries - 1) {
+                    Log.w("RetryHelper", "DNS falló (${e.message}), reintentando en ${delayMs}ms...")
+                    delay(delayMs)
+                }
+            }
+        }
+        throw lastError ?: Exception("Error desconocido")
     }
 
     private fun truncate(text: String, maxLength: Int = 40): String {
@@ -90,10 +108,13 @@ class PriceUpdateWorker(
 
         val shortName = truncate(productName, 40)
 
+        val percentageDiscount = ((oldPrice - newPrice) * 100 / oldPrice).toInt()
+
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setContentTitle("¡Hey! $shortName ha bajado de precio")
+            .setContentTitle("¡Hey, $shortName ha bajado de precio un $percentageDiscount%!")
             .setContentText("Antes costaba $oldPrice€, ahora cuesta $newPrice€")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
         notifManager.notify(NOTIF_ID + productName.hashCode(), notification)

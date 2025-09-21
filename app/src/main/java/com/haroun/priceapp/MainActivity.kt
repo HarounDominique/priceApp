@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.math.truncate
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,15 +121,15 @@ fun MainScreen() {
             // --------------------
             // 🔧 Botón para simular cambio de precio (TEST)
             // --------------------
-            /*
+
             Button(
                 onClick = {
                     scope.launch {
                         val products = productDao.getAllProducts().firstOrNull()
-                        products?.firstOrNull()?.let { firstProduct ->
-                            val updatedProduct = firstProduct.copy(
-                                price = (firstProduct.price.toDouble() + 1).toString(), // subir 1€
-                                timestamp = System.currentTimeMillis() - (11*60 + 59) * 60 * 1000 // 11h59m atrás
+                        products?.forEach { product ->
+                            val updatedProduct = product.copy(
+                                price = (product.price.toDouble() + 1).toString(), // subir 1€
+                                timestamp = System.currentTimeMillis() - (11 * 60 + 59) * 60 * 1000 // 11h59m atrás
                             )
                             productDao.insert(updatedProduct)
                         }
@@ -140,12 +141,42 @@ fun MainScreen() {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            */
+
 
             // --------------------
-            // 🔧 Botón para forzar consulta automática (TEST)
-            // --------------------
-            /*
+// 🔧 Botón para forzar consulta automática (TEST)
+// --------------------
+
+            // Función para truncar texto con "..."
+            fun truncate(text: String, maxLength: Int = 40): String {
+                return if (text.length > maxLength) {
+                    text.take(maxLength).substringBeforeLast(" ") + "..."
+                } else {
+                    text
+                }
+            }
+
+            // Reintento en caso de fallo DNS (igual que en PriceUpdateWorker)
+            suspend fun <T> retryOnHostResolution(
+                retries: Int = 3,
+                delayMs: Long = 5000,
+                block: suspend () -> T
+            ): T {
+                var lastError: Exception? = null
+                repeat(retries) { attempt ->
+                    try {
+                        return block()
+                    } catch (e: java.net.UnknownHostException) {
+                        lastError = e
+                        if (attempt < retries - 1) {
+                            Log.w("RetryHelper", "DNS falló (${e.message}), reintentando en ${delayMs}ms...")
+                            kotlinx.coroutines.delay(delayMs)
+                        }
+                    }
+                }
+                throw lastError ?: Exception("Error desconocido")
+            }
+
             Button(
                 onClick = {
                     scope.launch {
@@ -157,7 +188,9 @@ fun MainScreen() {
                             val products = productDao.getAllProductsOnce()
                             products.forEach { product ->
                                 try {
-                                    val response = RetrofitClient.api.getPrice(UrlRequest(product.url))
+                                    val response = retryOnHostResolution {
+                                        RetrofitClient.api.getPrice(UrlRequest(product.url))
+                                    }
                                     val newPrice = response.price.toDoubleOrNull() ?: return@forEach
                                     val oldPrice = product.price.toDoubleOrNull() ?: return@forEach
 
@@ -180,9 +213,12 @@ fun MainScreen() {
                                             notifManager.createNotificationChannel(channel)
                                         }
 
+                                        val shortName = truncate(product.name, 40)
+                                        val percentageDiscount = ((oldPrice - newPrice) * 100 / oldPrice).toInt()
+
                                         val notification = NotificationCompat.Builder(context, channelId)
-                                            .setContentTitle("Precio bajó: ${product.name}")
-                                            .setContentText("De $oldPrice → $newPrice")
+                                            .setContentTitle("¡Hey, $shortName ha bajado de precio un $percentageDiscount%!")
+                                            .setContentText("Antes costaba $oldPrice€, ahora cuesta $newPrice€")
                                             .setSmallIcon(android.R.drawable.ic_dialog_info)
                                             .setPriority(NotificationCompat.PRIORITY_HIGH)
                                             .build()
@@ -208,7 +244,6 @@ fun MainScreen() {
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            */
 
             // Lista de productos guardados
             ProductList(productDao = productDao)
