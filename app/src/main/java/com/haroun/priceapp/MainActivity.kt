@@ -9,12 +9,15 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -265,10 +268,46 @@ fun MyTopAppBar(title: String) {
 fun ProductList(productDao: ProductDao) {
     val products by productDao.getAllProducts().collectAsState(initial = emptyList())
 
-    LazyColumn {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(8.dp)
+    ) {
         items(products) { product ->
-            val shortName = truncate(product.name)
-            Text("$shortName → ${product.price}€ (${formatDate(product.timestamp)})")
+            ProductCard(product)
+            Spacer(modifier = Modifier.height(8.dp)) // separación entre tarjetas
+        }
+    }
+}
+
+@Composable
+fun ProductCard(product: Product) {
+    val shortName = truncate(product.name)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { /* Aquí puedes abrir detalle o modal */ },
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(6.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = shortName,
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${product.price}€",
+                style = MaterialTheme.typography.titleSmall,
+                color = Color(0xFF388E3C) // verde para precio
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = formatDate(product.timestamp),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
         }
     }
 }
