@@ -121,7 +121,7 @@ fun MainScreen() {
             // --------------------
             // 🔧 Botón para simular cambio de precio (TEST)
             // --------------------
-
+            /*
             Button(
                 onClick = {
                     scope.launch {
@@ -142,11 +142,12 @@ fun MainScreen() {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            */
 
             // --------------------
-// 🔧 Botón para forzar consulta automática (TEST)
-// --------------------
-
+            // 🔧 Botón para forzar consulta automática (TEST)
+            // --------------------
+            /*
             // Función para truncar texto con "..."
             fun truncate(text: String, maxLength: Int = 40): String {
                 return if (text.length > maxLength) {
@@ -242,7 +243,7 @@ fun MainScreen() {
             ) {
                 Text("Forzar consulta automática")
             }
-
+            */
             Spacer(modifier = Modifier.height(16.dp))
 
             // Lista de productos guardados
@@ -266,7 +267,8 @@ fun ProductList(productDao: ProductDao) {
 
     LazyColumn {
         items(products) { product ->
-            Text("${product.name} → ${product.price} (${formatDate(product.timestamp)})")
+            val shortName = truncate(product.name)
+            Text("$shortName → ${product.price}€ (${formatDate(product.timestamp)})")
         }
     }
 }
@@ -281,5 +283,13 @@ fun formatDate(timestamp: Long): String {
 fun MainScreenPreview() {
     PriceAppTheme {
         MainScreen()
+    }
+}
+
+private fun truncate(text: String, maxLength: Int = 40): String {
+    return if (text.length > maxLength) {
+        text.take(maxLength).substringBeforeLast(" ") + "..."
+    } else {
+        text
     }
 }
